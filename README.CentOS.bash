@@ -9,17 +9,12 @@ sudo yum install -y gcc
 sudo yum install -y libcurl-devel
 sudo yum install -y libevent-devel
 sudo yum install -y libkadm5
-sudo yum install -y libxml2
 sudo yum install -y libxml2-devel
 sudo yum install -y perl-ExtUtils-Embed
 sudo yum install -y python-devel
+sudo yum install -y python-lockfile
+sudo yum install -y python-paramiko
+sudo yum install -y python-psutil
+sudo yum install -y python-setuptools
 sudo yum install -y readline-devel
-sudo yum install -y zlib
 sudo yum install -y zlib-devel
-
-# Install pip
-wget https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
-sudo rpm -Uvh epel-release-latest-6.noarch.rpm
-sudo yum install -y python-pip
-
-sudo pip install lockfile paramiko psutil setuptools
