@@ -1,13 +1,7 @@
-### Install prerequisites
-
-Please add to this list if you discover additional prerequisites.
+### Install dependencies
 
 ```bash
-sudo yum install \
-	bison flex \
-	perl-ExtUtils-Embed \
-	readline-devel apr-devel libevent-devel \
-	libcurl-devel bzip2-devel python-devel
+./README.CentOS.bash
 ```
 
 ### Get an updated GCC on CentOS 6
@@ -21,6 +15,11 @@ sudo yum install devtoolset-6-toolchain
 
 Now running `scl enable devtoolset-6 bash` starts a bash session that puts gcc 6.3 in `$PATH`.
 
-### See also
+Alternatively, install [devtoolset-2](http://linux.web.cern.ch/linux/devtoolset/#dts2), which contains gcc 4.8
 
-[README for general Linux](README.linux.md)
+```bash
+sudo wget -O /etc/yum.repos.d/slc6-devtoolset.repo http://linuxsoft.cern.ch/cern/devtoolset/slc6-devtoolset.repo
+sudo yum install -y --nogpgcheck devtoolset-2
+```
+
+Now running `scl enable devtoolset-2 bash` starts a bash session that puts gcc 4.8 in `$PATH`.
