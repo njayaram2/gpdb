@@ -4,6 +4,7 @@ set -eox pipefail
 
 CWDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${CWDIR}/common.bash"
+source "${CWDIR}/postgis_orca_rhel.bash"
 
 function gen_env(){
   cat > /opt/run_test.sh <<-EOF
@@ -81,11 +82,12 @@ function _main() {
     time setup_gpadmin_user
     time make_cluster
     time gen_env
-    time run_test
+    time ./gpdb_src/concourse/scripts/postgis_orca_rhel6.bash
+    # time run_test
 
-    if [ "${TEST_BINARY_SWAP}" == "true" ]; then
-        time ./gpdb_src/concourse/scripts/test_binary_swap_gpdb.bash
-    fi
+    # if [ "${TEST_BINARY_SWAP}" == "true" ]; then
+    #     time ./gpdb_src/concourse/scripts/test_binary_swap_gpdb.bash
+    # fi
 }
 
 _main "$@"
