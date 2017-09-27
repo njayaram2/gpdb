@@ -4,7 +4,6 @@ set -eox pipefail
 
 CWDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${CWDIR}/common.bash"
-source "${CWDIR}/postgis_orca_rhel.bash"
 
 function gen_env(){
   cat > /opt/run_test.sh <<-EOF
