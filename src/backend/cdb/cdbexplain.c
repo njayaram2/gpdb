@@ -1962,6 +1962,7 @@ cdbexplain_showExecStatsEnd(struct PlannedStmt *stmt,
 	Slice	   *slice;
 	int			sliceIndex;
 	int			flag;
+	long		total_memory_across_slices = 0;
 
 	char		avgbuf[50];
 	char		maxbuf[50];
@@ -1977,6 +1978,7 @@ cdbexplain_showExecStatsEnd(struct PlannedStmt *stmt,
 	{
 		CdbExplain_SliceSummary *ss = &showstatctx->slices[sliceIndex];
 		CdbExplain_DispatchSummary *ds = &ss->dispatchSummary;
+		long slice_memory = 0;
 
 		appendStringInfo(str, "  (slice%d) ", sliceIndex);
 		if (sliceIndex < 10)
@@ -2097,6 +2099,8 @@ cdbexplain_showExecStatsEnd(struct PlannedStmt *stmt,
 								 "  Peak memory: %s%s.",
 								 maxbuf,
 								 seg);
+				slice_memory = atoi(maxbuf);
+				total_memory_across_slices += slice_memory;
 			}
 			else if (ss->memory_accounting_global_peak.vcnt > 1)
 			{
@@ -2108,6 +2112,8 @@ cdbexplain_showExecStatsEnd(struct PlannedStmt *stmt,
 								 ss->memory_accounting_global_peak.vcnt,
 								 maxbuf,
 								 segbuf);
+				slice_memory = (atoi(maxbuf) * ss->memory_accounting_global_peak.vcnt);
+				total_memory_across_slices += slice_memory;
 			}
 
 			/* Vmem reserved by QEs */
@@ -2162,6 +2168,11 @@ cdbexplain_showExecStatsEnd(struct PlannedStmt *stmt,
 		}
 
 		appendStringInfoChar(str, '\n');
+	}
+
+	if (total_memory_across_slices > 0)
+	{
+		appendStringInfo(str, "Total memory used across slices: %dK  bytes \n", total_memory_across_slices);
 	}
 
 	if (!IsResManagerMemoryPolicyNone())
