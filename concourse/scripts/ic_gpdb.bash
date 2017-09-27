@@ -81,12 +81,10 @@ function _main() {
     time setup_gpadmin_user
     time make_cluster
     time gen_env
+    # Run postgis related script
+    chmod a+x ./gpdb_src/concourse/scripts/postgis_orca_rhel6.bash
     time ./gpdb_src/concourse/scripts/postgis_orca_rhel6.bash
-    # time run_test
 
-    # if [ "${TEST_BINARY_SWAP}" == "true" ]; then
-    #     time ./gpdb_src/concourse/scripts/test_binary_swap_gpdb.bash
-    # fi
 }
 
 _main "$@"
