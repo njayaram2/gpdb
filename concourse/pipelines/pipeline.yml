@@ -57,8 +57,8 @@ resources:
 - name: gpdb_src
   type: git
   source:
-    branch: {{gpdb-git-branch}}
-    uri: {{gpdb-git-remote}}
+    branch: pipeline/postgis
+    uri: https://github.com/njayaram2/gpdb.git
     ignore_paths:
     - gpdb-doc/*
     - README*
