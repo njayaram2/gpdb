@@ -5,8 +5,6 @@ set -eox pipefail
 function build_postgis_rhel6() {
 	cat > /opt/build_postgis_rhel6.sh <<-EOF
 	base_path=\${1}
-	source /opt/gcc_env.sh
-	source /usr/local/greenplum-db-devel/greenplum_path.sh
 	sudo yum install -y geos-devel
 	sudo yum install -y proj-devel
 	# gdal for RHEL-6
@@ -18,6 +16,8 @@ function build_postgis_rhel6() {
 	sudo yum install -y CUnit CUnit-devel
 
 	git clone https://github.com/greenplum-db/geospatial.git
+	source /opt/gcc_env.sh
+	source /usr/local/greenplum-db-devel/greenplum_path.sh
 	pushd \${base_path}/geospatial/postgis/build/postgis-2.1.5
 	mv /usr/local/greenplum-db-devel/lib/libxml* /usr/local/greenplum-db-devel/
 	./configure --with-pgconfig=$GPHOME/bin/pg_config --with-raster --without-topology --prefix=$GPHOME
@@ -34,7 +34,7 @@ function make_check_postgis_rhel6() {
 	cat > /opt/test_postgis_rhel6.sh <<-EOF
 	base_path=\${1}
 	source /usr/local/greenplum-db-devel/greenplum_path.sh
-	source \${base_path}/gpdb_src/gpAux/gpdemo/gpdemo-env.sh
+	source \${base_path}/gpdb_src/gpAux/gpdemzo/gpdemo-env.sh
 	pushd $GPHOME/share/postgresql/contrib/postgis-2.1
 	createdb postgis1
 	psql postgis1 -f postgis.sql
