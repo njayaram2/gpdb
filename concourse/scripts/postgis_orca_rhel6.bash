@@ -18,13 +18,13 @@ function build_postgis_rhel6() {
 	sudo yum install -y CUnit CUnit-devel
 
 	git clone https://github.com/greenplum-db/geospatial.git
-	cd geospatial/postgis/build/postgis-2.1.5
+	pushd \${base_path}/geospatial/postgis/build/postgis-2.1.5
 	mv /usr/local/greenplum-db-devel/lib/libxml* /usr/local/greenplum-db-devel/
 	./configure --with-pgconfig=$GPHOME/bin/pg_config --with-raster --without-topology --prefix=$GPHOME
 	make
 	sudo make install
-
-	chown -R gpadmin:gpadmin geospatial
+	popd
+	chown -R gpadmin:gpadmin \${base_path}/geospatial
 	EOF
 
 	chmod a+x /opt/build_postgis_rhel6.sh
@@ -33,11 +33,9 @@ function build_postgis_rhel6() {
 function make_check_postgis_rhel6() {
 	cat > /opt/test_postgis_rhel6.sh <<-EOF
 	base_path=\${1}
-	su gpadmin
 	source /usr/local/greenplum-db-devel/greenplum_path.sh
 	source \${base_path}/gpdb_src/gpAux/gpdemo/gpdemo-env.sh
-	gpstart -a
-	cd $GPHOME/share/postgresql/contrib/postgis-2.1
+	pushd $GPHOME/share/postgresql/contrib/postgis-2.1
 	createdb postgis1
 	psql postgis1 -f postgis.sql
 	psql postgis1 -f legacy.sql
@@ -47,8 +45,8 @@ function make_check_postgis_rhel6() {
 	psql postgis1 -f spatial_ref_sys.sql
 	psql postgis1 -f rtpostgis.sql
 	psql postgis1 -f raster_comments.sql
-
-	cd geospatial/postgis/build/postgis-2.1.5
+	popd
+	pushd \${base_path}/geospatial/postgis/build/postgis-2.1.5
 	make check
 	EOF
 
@@ -62,12 +60,12 @@ function build_gppkg_rhel6() {
 	source /tmp/build/e18b2f02/gpdb_src/gpAux/gpdemo/gpdemo-env.sh
 	source /opt/gcc_env.sh
 
-	cd gpdb_src/gpAux
+	pushd \${base_path}/gpdb_src/gpAux
 	make sync_tools [BLD_ARCH="rhel6_x86_64"]
-	cd ../../geospatial/postgis/package
-
+	popd
+	pushd ../../geospatial/postgis/package
 	make BLD_TARGETS="gppkg" BLD_ARCH="rhel6_x86_64" INSTLOC=$GPHOME BLD_TOP="$base_path/gpdb_src/gpAux" POSTGIS_DIR="$base_path/geospatial/postgis/build/postgis-2.1.5" gppkg
-
+	popd
 	#cp ./geospatial/postgis/package/postgis-ossv2.1.5_pv2.1_gpdb5.0-rhel7-x86_64.gppkg ./postgis_gppkg/
 	EOF
 	chmod a+x /opt/build_gppkg_rhel6.sh

@@ -8,7 +8,7 @@ resources:
 - name: gpdb_src
   type: git
   source:
-    branch: pipeline/postgis
+    branch: postgis_rhel6/5.0.0
     uri: https://github.com/njayaram2/gpdb.git
     ignore_paths:
     - gpdb-doc/*
