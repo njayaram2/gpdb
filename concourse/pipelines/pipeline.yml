@@ -72,6 +72,17 @@ groups:
   - DPM_backup-restore_ddboost_part3
   - gate_nightly_end
 ################################
+  - gate_advanced_analytics_start
+  - MADlib_Test_gppkg_Orca_centos6
+  - MADlib_Test_gppkg_Planner_centos6
+  - MADlib_Test_gppkg_Orca_centos7
+  - MADlib_Test_gppkg7_Planner_centos7
+  - postgis_centos6_ORCA_test
+  - postgis_centos6_planner_test
+  - postgis_centos7_ORCA_test
+  - postgis_centos7_planner_test
+  - gate_advanced_analytics_end
+################################
   - gate_general_misc_start
   - MM_gpcheckcat
   - QP_runaway-query
@@ -210,6 +221,19 @@ groups:
   - DPM_backup-restore_ddboost_part3
   - gate_nightly_end
 
+- name: G:AdvancedAnalytics
+  jobs:
+  - gate_advanced_analytics_start
+  - MADlib_Test_gppkg_Orca_centos6
+  - MADlib_Test_gppkg_Planner_centos6
+  - MADlib_Test_gppkg_Orca_centos7
+  - MADlib_Test_gppkg7_Planner_centos7
+  - postgis_centos6_ORCA_test
+  - postgis_centos6_planner_test
+  - postgis_centos7_ORCA_test
+  - postgis_centos7_planner_test
+  - gate_advanced_analytics_end
+
 - name: G:General
   jobs:
   - gate_general_misc_start
@@ -254,7 +278,7 @@ resources:
     branch: {{ccp-git-branch}}
     private_key: {{ccp-git-key}}
     uri: {{ccp-git-remote}}
-    tag_filter: 1.0.1
+    tag_filter: 1.0.0
 
 - name: terraform
   type: terraform
@@ -284,7 +308,7 @@ resources:
       ###########################################################
       bucket_path: {{tf-bucket-path}}
 
-- name: terraform_for_dpm
+- name: terraform_gpdb4
   type: terraform
   source:
     env:
@@ -575,6 +599,55 @@ resources:
     start: 8:00 AM
     stop: 9:00 AM
 
+- name: madlib_ci
+  type: git
+  source:
+    branch: {{madlib-ci-git-branch}}
+    uri: {{madlib-ci-git-remote}}
+    private_key: {{madlib-ci-git-key}}
+
+- name: madlib_gppkg
+  type: s3
+  source:
+    access_key_id: {{bucket-access-key-id}}
+    bucket: {{madlib-bucket-name}}
+    region_name: {{aws-region}}
+    secret_access_key: {{bucket-secret-access-key}}
+    versioned_file: {{madlib-gppkg-versioned-file}}
+
+- name: gcc_4.4.2_snowflake
+  type: s3
+  source:
+    access_key_id: {{madlib-s3-access_key_id}}
+    bucket: {{gcc-442-bucket}}
+    region_name: us-west-2
+    secret_access_key: {{madlib-s3-secret_access_key}}
+    versioned_file: compiled-rhel-gcc-442.tar.gz
+
+- name: postgis_src
+  type: git
+  source:
+    branch: master
+    uri: https://github.com/greenplum-db/geospatial.git
+
+- name: postgis_gppkg_centos6
+  type: s3
+  source:
+    access_key_id: {{bucket-access-key-id}}
+    bucket: {{madlib-bucket-name}}
+    region_name: {{aws-region}}
+    secret_access_key: {{bucket-secret-access-key}}
+    versioned_file: {{postgis-gppkg-versioned_file_centos6}}
+
+- name: postgis_gppkg_centos7
+  type: s3
+  source:
+    access_key_id: {{bucket-access-key-id}}
+    bucket: {{madlib-bucket-name}}
+    region_name: {{aws-region}}
+    secret_access_key: {{bucket-secret-access-key}}
+    versioned_file: {{postgis-gppkg-versioned_file_centos7}}
+
 ## ======================================================================
 ## reusable anchors
 ## ======================================================================
@@ -602,11 +675,11 @@ ccp_destroy_anchor: &ccp_destroy
   get_params:
     action: destroy
 
-dpm_ccp_destroy_anchor: &dpm_ccp_destroy
-  put: terraform_for_dpm
+ccp_destroy_anchor_gpdb4: &ccp_destroy_gpdb4
+  put: terraform_gpdb4
   params:
     action: destroy
-    env_name_file: terraform_for_dpm/name
+    env_name_file: terraform_gpdb4/name
     terraform_source: ccp_src/aws-pivotal-pa-toolsmiths/
     vars:
       aws_instance-node-instance_type: t2.micro #t2.micro is ignored in destroy, but aws_instance-node-instance_type is required.
@@ -644,7 +717,7 @@ debug_sleep_anchor: &debug_sleep
     ensure:
       <<: *ccp_destroy
 
-dpm_debug_sleep_anchor: &dpm_debug_sleep
+debug_sleep_anchor_gpdb4: &debug_sleep_gpdb4
   do:
   - task: debug_sleep
     config:
@@ -658,7 +731,7 @@ dpm_debug_sleep_anchor: &dpm_debug_sleep
         path: 'sh'
         args: ['-c', 'sleep 6h']
     ensure:
-      <<: *dpm_ccp_destroy
+      <<: *ccp_destroy_gpdb4
 
 pulse_properties_anchor: &pulse_properties
   PULSE_URL: {{pulse_url}}
@@ -1378,10 +1451,6 @@ jobs:
   - task: sleep_before_starting
     config:
       platform: linux
-      image_resource:
-        type: docker-image
-        source:
-          repository: alpine
       run:
         path: 'sh'
         args: ['-c', 'sleep 300']
@@ -1600,19 +1669,14 @@ jobs:
   plan:
   - aggregate:
     - get: gpdb_src
-      tags: ["gpdb5_ccp_external_worker"]
       passed: [gate_cs_misc_start]
     - get: gpdb_binary
-      tags: ["gpdb5_ccp_external_worker"]
       resource: bin_gpdb_centos6
       passed: [gate_cs_misc_start]
       trigger: true
     - get: ccp_src
-      tags: ["gpdb5_ccp_external_worker"]
     - get: centos-gpdb-dev-6
-      tags: ["gpdb5_ccp_external_worker"]
   - put: terraform
-    tags: ["gpdb5_ccp_external_worker"]
     params:
       <<: *ccp_default_params
       vars:
@@ -1621,14 +1685,12 @@ jobs:
         aws_ebs_volume_type: gp2
         number_of_nodes: 1
   - task: gen_cluster
-    tags: ["gpdb5_ccp_external_worker"]
     file: ccp_src/ci/tasks/gen_cluster.yml
     params:
       <<: *ccp_gen_cluster_default_params
     on_failure:
       <<: *ccp_destroy
   - task: run_tests
-    tags: ["gpdb5_ccp_external_worker"]
     file: gpdb_src/concourse/tasks/run_tinc.yml
     image: centos-gpdb-dev-6
     params:
@@ -1821,10 +1883,6 @@ jobs:
   - task: sleep_before_starting
     config:
       platform: linux
-      image_resource:
-        type: docker-image
-        source:
-          repository: alpine
       run:
         path: 'sh'
         args: ['-c', 'sleep 300']
@@ -2208,10 +2266,6 @@ jobs:
   - task: sleep_before_starting
     config:
       platform: linux
-      image_resource:
-        type: docker-image
-        source:
-          repository: alpine
       run:
         path: 'sh'
         args: ['-c', 'sleep 300']
@@ -2395,34 +2449,34 @@ jobs:
     trigger: true
   - aggregate:
     - get: ccp_src
-      tags: ["gpdb4_ccp_external_worker"]
+      tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
     - get: gpdb_src
-      tags: ["gpdb4_ccp_external_worker"]
+      tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
       passed: [gate_nightly_start]
     - get: gpdb_binary
-      tags: ["gpdb4_ccp_external_worker"]
+      tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
       resource: bin_gpdb_centos6
       passed: [gate_nightly_start]
     - get: centos-gpdb-dev-6
-      tags: ["gpdb4_ccp_external_worker"]
-  - put: terraform_for_dpm
+      tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
+  - put: terraform_gpdb4
     params:
       <<: *ccp_default_params
       terraform_source: ccp_src/aws-pivotal-pa-toolsmiths/
       vars:
         <<: *ccp_default_vars
-    tags: ["gpdb4_ccp_external_worker"]
+    tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
   - task: gen_cluster
     input_mapping:
-      terraform: terraform_for_dpm
-    tags: ["gpdb4_ccp_external_worker"]
+      terraform: terraform_gpdb4
+    tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
     file: ccp_src/ci/tasks/gen_cluster.yml
     params:
       <<: *ccp_gpdb4_gen_cluster_default_params
     on_failure:
-      <<: *dpm_ccp_destroy
+      <<: *ccp_destroy_gpdb4
   - task: run_tests
-    tags: ["gpdb4_ccp_external_worker"]
+    tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
     file: gpdb_src/concourse/tasks/run_behave.yml
     image: centos-gpdb-dev-6
     params:
@@ -2430,42 +2484,42 @@ jobs:
       CUSTOM_ENV: export DD_SOURCE_HOST={{datadomain_source_host}}; export DD_DEST_HOST={{datadomain_dest_host}}; export DD_USER={{datadomain_user}}; export DD_PASSWORD={{datadomain_password}};
       PRE_TEST_SCRIPT: "source /home/gpadmin/gpdb_src/concourse/scripts/backup_utils.sh; setup_ddboost"
     on_failure:
-      <<: *dpm_debug_sleep
-  - *dpm_ccp_destroy
+      <<: *debug_sleep_gpdb4
+  - *ccp_destroy_gpdb4
 - name: DPM_backup-restore_ddboost_part2
   plan:
   - get: nightly-trigger
     trigger: true
   - aggregate:
     - get: ccp_src
-      tags: ["gpdb4_ccp_external_worker"]
+      tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
     - get: gpdb_src
-      tags: ["gpdb4_ccp_external_worker"]
+      tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
       passed: [gate_nightly_start]
     - get: gpdb_binary
-      tags: ["gpdb4_ccp_external_worker"]
+      tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
       resource: bin_gpdb_centos6
       passed: [gate_nightly_start]
     - get: centos-gpdb-dev-6
-      tags: ["gpdb4_ccp_external_worker"]
-  - put: terraform_for_dpm
+      tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
+  - put: terraform_gpdb4
     params:
       <<: *ccp_default_params
       terraform_source: ccp_src/aws-pivotal-pa-toolsmiths/
       vars:
         <<: *ccp_default_vars
-    tags: ["gpdb4_ccp_external_worker"]
+    tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
   - task: gen_cluster
     input_mapping:
-      terraform: terraform_for_dpm
-    tags: ["gpdb4_ccp_external_worker"]
+      terraform: terraform_gpdb4
+    tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
     file: ccp_src/ci/tasks/gen_cluster.yml
     params:
       <<: *ccp_gpdb4_gen_cluster_default_params
     on_failure:
-      <<: *dpm_ccp_destroy
+      <<: *ccp_destroy_gpdb4
   - task: run_tests
-    tags: ["gpdb4_ccp_external_worker"]
+    tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
     file: gpdb_src/concourse/tasks/run_behave.yml
     image: centos-gpdb-dev-6
     params:
@@ -2473,42 +2527,42 @@ jobs:
       CUSTOM_ENV: export DD_SOURCE_HOST={{datadomain_source_host}}; export DD_DEST_HOST={{datadomain_dest_host}}; export DD_USER={{datadomain_user}}; export DD_PASSWORD={{datadomain_password}};
       PRE_TEST_SCRIPT: "source /home/gpadmin/gpdb_src/concourse/scripts/backup_utils.sh; setup_ddboost"
     on_failure:
-      <<: *dpm_debug_sleep
-  - *dpm_ccp_destroy
+      <<: *debug_sleep_gpdb4
+  - *ccp_destroy_gpdb4
 - name: DPM_backup-restore_ddboost_part3
   plan:
   - get: nightly-trigger
     trigger: true
   - aggregate:
     - get: ccp_src
-      tags: ["gpdb4_ccp_external_worker"]
+      tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
     - get: gpdb_src
-      tags: ["gpdb4_ccp_external_worker"]
+      tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
       passed: [gate_nightly_start]
     - get: gpdb_binary
-      tags: ["gpdb4_ccp_external_worker"]
+      tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
       resource: bin_gpdb_centos6
       passed: [gate_nightly_start]
     - get: centos-gpdb-dev-6
-      tags: ["gpdb4_ccp_external_worker"]
-  - put: terraform_for_dpm
+      tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
+  - put: terraform_gpdb4
     params:
       <<: *ccp_default_params
       terraform_source: ccp_src/aws-pivotal-pa-toolsmiths/
       vars:
         <<: *ccp_default_vars
-    tags: ["gpdb4_ccp_external_worker"]
+    tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
   - task: gen_cluster
     input_mapping:
-      terraform: terraform_for_dpm
-    tags: ["gpdb4_ccp_external_worker"]
+      terraform: terraform_gpdb4
+    tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
     file: ccp_src/ci/tasks/gen_cluster.yml
     params:
       <<: *ccp_gpdb4_gen_cluster_default_params
     on_failure:
-      <<: *dpm_ccp_destroy
+      <<: *ccp_destroy_gpdb4
   - task: run_tests
-    tags: ["gpdb4_ccp_external_worker"]
+    tags: ["gpdb4_ccp_external_worker_in_gpdb5"]
     file: gpdb_src/concourse/tasks/run_behave.yml
     image: centos-gpdb-dev-6
     params:
@@ -2516,8 +2570,8 @@ jobs:
       CUSTOM_ENV: export DD_SOURCE_HOST={{datadomain_source_host}}; export DD_DEST_HOST={{datadomain_dest_host}}; export DD_USER={{datadomain_user}}; export DD_PASSWORD={{datadomain_password}};
       PRE_TEST_SCRIPT: "source /home/gpadmin/gpdb_src/concourse/scripts/backup_utils.sh; setup_ddboost"
     on_failure:
-      <<: *dpm_debug_sleep
-  - *dpm_ccp_destroy
+      <<: *debug_sleep_gpdb4
+  - *ccp_destroy_gpdb4
 - name: gate_nightly_end
   plan:
   - get: gpdb_src
@@ -2532,6 +2586,246 @@ jobs:
     - DPM_backup-restore_ddboost_part2
     - DPM_backup-restore_ddboost_part3
 ############### Nightly End
+
+############### Advanced Analytics Start
+- name: gate_advanced_analytics_start
+  plan:
+  - task: sleep_before_starting
+    config:
+      platform: linux
+      run:
+        path: 'sh'
+        args: ['-c', 'sleep 300']
+  - get: gpdb_src
+    passed:
+    - gate_icw_end
+    trigger: true
+  - get: bin_gpdb_centos6
+    passed:
+    - gate_icw_end
+  - get: bin_gpdb_centos7
+    passed:
+    - gate_icw_end
+
+- name: MADlib_Test_gppkg_Orca_centos6
+  plan:
+  - aggregate:
+    - get: madlib_ci
+      trigger: true
+    - get: gpdb_src
+      passed:
+      - gate_advanced_analytics_start
+    - get: bin_gpdb
+      resource: bin_gpdb_centos6
+      trigger: true
+      passed:
+      - gate_advanced_analytics_start
+    - get: centos-gpdb-dev-6
+    - get: madlib_gppkg
+  - task: MADlib_Test_gppkg
+    file: madlib_ci/concourse/tasks/madlib_test_gppkg.yml
+    image: centos-gpdb-dev-6
+    params:
+      TEST_OS: centos
+      ORCA: "on"
+
+- name: MADlib_Test_gppkg_Planner_centos6
+  plan:
+  - aggregate:
+    - get: madlib_ci
+      trigger: true
+    - get: gpdb_src
+      passed:
+      - gate_advanced_analytics_start
+    - get: bin_gpdb
+      resource: bin_gpdb_centos6
+      trigger: true
+      passed:
+      - gate_advanced_analytics_start
+    - get: centos-gpdb-dev-6
+    - get: madlib_gppkg
+  - task: MADlib_Test_gppkg
+    file: madlib_ci/concourse/tasks/madlib_test_gppkg.yml
+    image: centos-gpdb-dev-6
+    params:
+      TEST_OS: centos
+      ORCA: "off"
+
+- name: MADlib_Test_gppkg_Orca_centos7
+  plan:
+  - aggregate:
+    - get: madlib_ci
+      trigger: true
+    - get: gpdb_src
+      passed:
+      - gate_advanced_analytics_start
+    - get: bin_gpdb
+      resource: bin_gpdb_centos7
+      trigger: true
+      passed:
+      - gate_advanced_analytics_start
+    - get: centos-gpdb-dev-7
+    - get: madlib_gppkg
+  - task: MADlib_Test_gppkg
+    file: madlib_ci/concourse/tasks/madlib_test_gppkg.yml
+    image: centos-gpdb-dev-7
+    params:
+      TEST_OS: centos
+      ORCA: "on"
+
+- name: MADlib_Test_gppkg7_Planner_centos7
+  plan:
+  - aggregate:
+    - get: madlib_ci
+      trigger: true
+    - get: gpdb_src
+      passed:
+      - gate_advanced_analytics_start
+    - get: bin_gpdb
+      resource: bin_gpdb_centos7
+      trigger: true
+      passed:
+      - gate_advanced_analytics_start
+    - get: centos-gpdb-dev-7
+    - get: madlib_gppkg
+  - task: MADlib_Test_gppkg
+    file: madlib_ci/concourse/tasks/madlib_test_gppkg.yml
+    image: centos-gpdb-dev-7
+    params:
+      TEST_OS: centos
+      ORCA: "off"
+
+- name: postgis_centos6_ORCA_test
+  plan:
+  - aggregate:
+    - get: madlib_ci
+    - get: postgis_src
+    - get: postgis_gppkg
+      resource: postgis_gppkg_centos6
+      trigger: true
+    - get: bin_gpdb
+      resource: bin_gpdb_centos6
+      trigger: true
+      passed:
+      - gate_advanced_analytics_start
+    - get: centos-gpdb-dev-6
+    - get: gpdb_src
+      passed:
+      - gate_advanced_analytics_start
+    - get: gcc_4.4.2_snowflake
+  - task: test_postgis
+    file: madlib_ci/concourse/tasks/test_postgis.yml
+    image: centos-gpdb-dev-6
+    params:
+      PGOPTIONS: '-c optimizer=on'
+      TEST_OS: centos6
+      IVYREPO_HOST: {{ivyrepo_host}}
+      IVYREPO_REALM: {{ivyrepo_realm}}
+      IVYREPO_USER: {{ivyrepo_user}}
+      IVYREPO_PASSWD: {{ivyrepo_passwd}}
+
+- name: postgis_centos6_planner_test
+  plan:
+  - aggregate:
+    - get: madlib_ci
+    - get: postgis_src
+    - get: postgis_gppkg
+      resource: postgis_gppkg_centos6
+      trigger: true
+    - get: bin_gpdb
+      resource: bin_gpdb_centos6
+      trigger: true
+      passed:
+      - gate_advanced_analytics_start
+    - get: centos-gpdb-dev-6
+    - get: gpdb_src
+      passed:
+      - gate_advanced_analytics_start
+    - get: gcc_4.4.2_snowflake
+  - task: test_postgis
+    file: madlib_ci/concourse/tasks/test_postgis.yml
+    image: centos-gpdb-dev-6
+    params:
+      PGOPTIONS: '-c optimizer=off'
+      TEST_OS: centos6
+      IVYREPO_HOST: {{ivyrepo_host}}
+      IVYREPO_REALM: {{ivyrepo_realm}}
+      IVYREPO_USER: {{ivyrepo_user}}
+      IVYREPO_PASSWD: {{ivyrepo_passwd}}
+
+- name: postgis_centos7_ORCA_test
+  plan:
+  - aggregate:
+    - get: madlib_ci
+    - get: postgis_src
+    - get: postgis_gppkg
+      resource: postgis_gppkg_centos7
+      trigger: true
+    - get: bin_gpdb
+      resource: bin_gpdb_centos7
+      trigger: true
+      passed:
+      - gate_advanced_analytics_start
+    - get: centos-gpdb-dev-7
+    - get: gpdb_src
+      passed:
+      - gate_advanced_analytics_start
+    - get: gcc_4.4.2_snowflake
+  - task: test_postgis
+    file: madlib_ci/concourse/tasks/test_postgis.yml
+    image: centos-gpdb-dev-7
+    params:
+      PGOPTIONS: '-c optimizer=on'
+      TEST_OS: centos7
+      IVYREPO_HOST: {{ivyrepo_host}}
+      IVYREPO_REALM: {{ivyrepo_realm}}
+      IVYREPO_USER: {{ivyrepo_user}}
+      IVYREPO_PASSWD: {{ivyrepo_passwd}}
+
+- name: postgis_centos7_planner_test
+  plan:
+  - aggregate:
+    - get: madlib_ci
+    - get: postgis_src
+    - get: postgis_gppkg
+      resource: postgis_gppkg_centos7
+      trigger: true
+    - get: bin_gpdb
+      resource: bin_gpdb_centos7
+      trigger: true
+      passed:
+      - gate_advanced_analytics_start
+    - get: centos-gpdb-dev-7
+    - get: gpdb_src
+      passed:
+      - gate_advanced_analytics_start
+    - get: gcc_4.4.2_snowflake
+  - task: test_postgis
+    file: madlib_ci/concourse/tasks/test_postgis.yml
+    image: centos-gpdb-dev-7
+    params:
+      PGOPTIONS: '-c optimizer=off'
+      TEST_OS: centos7
+      IVYREPO_HOST: {{ivyrepo_host}}
+      IVYREPO_REALM: {{ivyrepo_realm}}
+      IVYREPO_USER: {{ivyrepo_user}}
+      IVYREPO_PASSWD: {{ivyrepo_passwd}}
+
+- name: gate_advanced_analytics_end
+  plan:
+  - get: gpdb_src
+    trigger: true
+    passed:
+    - MADlib_Test_gppkg_Orca_centos6
+    - MADlib_Test_gppkg_Planner_centos6
+    - MADlib_Test_gppkg_Orca_centos7
+    - MADlib_Test_gppkg7_Planner_centos7
+    - postgis_centos6_ORCA_test
+    - postgis_centos6_planner_test
+    - postgis_centos7_ORCA_test
+    - postgis_centos7_planner_test
+
+############### Advanced Analytics End
 
 ################ General Misc Start
 - name: gate_general_misc_start
@@ -3035,4 +3329,11 @@ jobs:
     - QP_runaway-query
     - QP_optimizer-functional
     - validate_pipeline
-
+    - MADlib_Test_gppkg_Orca_centos6
+    - MADlib_Test_gppkg_Planner_centos6
+    - MADlib_Test_gppkg_Orca_centos7
+    - MADlib_Test_gppkg7_Planner_centos7
+    - postgis_centos6_ORCA_test
+    - postgis_centos6_planner_test
+    - postgis_centos7_ORCA_test
+    - postgis_centos7_planner_test
